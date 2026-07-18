@@ -42,3 +42,12 @@ fxmanager-installer -dir ./my-fivem-server -license cfxk_YOUR_LICENSE_KEY
 ```bash
 fxmanager-installer -dir ./myserver -os linux -license cfxk_YOUR_LICENSE_KEY -recipe https://github.com/overextended/txAdminRecipe
 ```
+
+## Build the project locally
+
+```bash
+# windows
+go build -o build/fxmanager-installer.exe .
+# linux
+go build -o build/fxmanager-installer .
+```
