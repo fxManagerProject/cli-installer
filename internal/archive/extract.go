@@ -21,8 +21,7 @@ import (
 var httpClient = &http.Client{Timeout: 5 * time.Minute}
 
 // DownloadToTemp streams a URL to a temp file and returns its path.
-// The caller is responsible for removing it
-func DownloadToTemp(url string) (string, error) {
+func DownloadToTemp(url string, onProgress func(ratio float64)) (string, error) {
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return "", err
@@ -45,11 +44,41 @@ func DownloadToTemp(url string) (string, error) {
 	}
 	defer f.Close()
 
-	if _, err := io.Copy(f, resp.Body); err != nil {
+	var body io.Reader = resp.Body
+	if onProgress != nil && resp.ContentLength > 0 {
+		body = &progressReader{r: resp.Body, total: resp.ContentLength, onProgress: onProgress}
+	}
+
+	if _, err := io.Copy(f, body); err != nil {
 		os.Remove(f.Name())
 		return "", fmt.Errorf("writing download to temp file: %w", err)
 	}
 	return f.Name(), nil
+}
+
+// progressReader wraps an io.Reader and reports cumulative bytes read
+// as a 0.0-1.0 ratio of total. Reports are throttled to whole
+// percentage-point changes so a fast local network doesn't flood the
+// UI layer with updates it can't render fast enough anyway.
+type progressReader struct {
+	r          io.Reader
+	total      int64
+	read       int64
+	lastPct    int
+	onProgress func(ratio float64)
+}
+
+func (p *progressReader) Read(buf []byte) (int, error) {
+	n, err := p.r.Read(buf)
+	if n > 0 {
+		p.read += int64(n)
+		pct := int(float64(p.read) / float64(p.total) * 100)
+		if pct != p.lastPct {
+			p.lastPct = pct
+			p.onProgress(float64(p.read) / float64(p.total))
+		}
+	}
+	return n, err
 }
 
 // ExtractAuto picks zip or tar.gz extraction based on the URL/filename

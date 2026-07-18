@@ -55,7 +55,7 @@ func ParseOverride(raw string) (Target, error) {
 // ghrelease.Release.FindAsset) that identifies the fxManager webpanel
 // binary+assets archive for this target among a release's assets.
 // fxManager ships one archive per OS (e.g. containing
-// "fxmanager-windows.exe" + "public/"), named to include the OS
+// "fxmanager-windows.exe" + "assets/"), named to include the OS
 func (t Target) FxManagerAssetPattern() string {
 	return string(t)
 }

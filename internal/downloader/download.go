@@ -14,8 +14,9 @@ import (
 // Progress is an optional callback for reporting install progress back
 // to a UI layer (TUI, plain stdout, whatever)
 type Progress struct {
-	OnStart func(url string)
-	OnDone  func(url, destDir string)
+	OnStart    func(url string)
+	OnProgress func(ratio float64) // called repeatedly during download, 0.0-1.0; may never fire if the server omits Content-Length
+	OnDone     func(url, destDir string)
 }
 
 // DownloadAndExtract downloads the file at url and extracts it into
@@ -29,7 +30,7 @@ func DownloadAndExtract(url, destDir string, filenameHint string, progress *Prog
 		progress.OnStart(url)
 	}
 
-	tmpFile, err := archive.DownloadToTemp(url)
+	tmpFile, err := archive.DownloadToTemp(url, progressCallback(progress))
 	if err != nil {
 		return fmt.Errorf("downloading %s: %w", url, err)
 	}
@@ -48,6 +49,15 @@ func DownloadAndExtract(url, destDir string, filenameHint string, progress *Prog
 		progress.OnDone(url, destDir)
 	}
 	return nil
+}
+
+// progressCallback safely extracts OnProgress from a possibly-nil
+// Progress so callers of archive.DownloadToTemp never need a nil check.
+func progressCallback(p *Progress) func(ratio float64) {
+	if p == nil {
+		return nil
+	}
+	return p.OnProgress
 }
 
 // DownloadAndExtractToTemp downloads and extracts into a freshly

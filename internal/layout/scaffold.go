@@ -108,9 +108,14 @@ func (p *Paths) RemoveTxAdminResource() error {
 	if err != nil {
 		return err
 	}
-
-	dest := filepath.Join(sysRes, "monitor")
-	return os.RemoveAll(dest)
+	monitorDir := filepath.Join(sysRes, "monitor")
+	if _, err := os.Stat(monitorDir); os.IsNotExist(err) {
+		return nil
+	}
+	if err := os.RemoveAll(monitorDir); err != nil {
+		return fmt.Errorf("removing stock monitor resource at %s: %w", monitorDir, err)
+	}
+	return nil
 }
 
 // copyTree recursively copies src into dst (dst is created if needed)

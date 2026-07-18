@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"charm.land/bubbles/v2/progress"
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -37,6 +38,8 @@ var (
 // Bubble Tea Messages
 type statusMsg string
 type subStatusMsg string
+type progressMsg float64
+type hideProgressMsg struct{}
 type errMsg struct{ err error }
 type successMsg struct {
 	paths     *layout.Paths
@@ -45,14 +48,16 @@ type successMsg struct {
 
 // Bubble Tea Model
 type model struct {
-	spinner    spinner.Model
-	steps      []string
-	activeStep string
-	subStatus  string
-	err        error
-	complete   bool
-	finalPaths *layout.Paths
-	noLicense  bool
+	spinner      spinner.Model
+	progress     progress.Model
+	showProgress bool
+	steps        []string
+	activeStep   string
+	subStatus    string
+	err          error
+	complete     bool
+	finalPaths   *layout.Paths
+	noLicense    bool
 }
 
 func (m model) Init() tea.Cmd {
@@ -72,10 +77,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.activeStep = string(msg)
 		m.subStatus = ""
+		m.showProgress = false // Default to spinner on new steps
 		return m, nil
 	case subStatusMsg:
 		m.subStatus = string(msg)
 		return m, nil
+	case progressMsg:
+		m.showProgress = true
+		return m, m.progress.SetPercent(float64(msg))
+	case hideProgressMsg:
+		m.showProgress = false
+		return m, nil
+	case progress.FrameMsg:
+		var cmd tea.Cmd
+		m.progress, cmd = m.progress.Update(msg)
+		return m, cmd
 	case errMsg:
 		m.err = msg.err
 		return m, tea.Quit
@@ -88,55 +104,77 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.noLicense = msg.noLicense
 		return m, tea.Quit
 	default:
-		// Let the spinner handle its internal tick messages
-		var cmd tea.Cmd
-		m.spinner, cmd = m.spinner.Update(msg)
-		return m, cmd
+		// Route generic messages (like window resize) and internal ticks to both components
+		var spinnerCmd, progressCmd tea.Cmd
+
+		m.spinner, spinnerCmd = m.spinner.Update(msg)
+		m.progress, progressCmd = m.progress.Update(msg)
+
+		return m, tea.Batch(spinnerCmd, progressCmd)
 	}
+
 	return m, nil
 }
 
 func (m model) View() tea.View {
 	var s strings.Builder
 
-	fmt.Fprintf(fmt.Sprintf("\n  %s\n", titleStyle.Render("fxManager Server Installer")))
-	fmt.Fprintf("  =============================\n\n")
+	fmt.Fprintf(&s, "\n  %s\n", titleStyle.Render("fxManager Server Installer"))
+	s.WriteString("  =============================\n\n")
 
-	// Render completed steps
 	for _, step := range m.steps {
-		s.WriteString(fmt.Sprintf("  %s\n", doneStyle.Render(step)))
+		fmt.Fprintf(&s, "  %s\n", doneStyle.Render(step))
 	}
 
-	// Render error state
 	if m.err != nil {
-		s.WriteString(fmt.Sprintf("\n  %s\n", errorStyle.Render("❌ Error: "+m.err.Error())))
+		fmt.Fprintf(&s, "\n  %s\n", errorStyle.Render("❌ Error: "+m.err.Error()))
 		return tea.NewView(s.String())
 	}
 
-	// Render completed state summary
 	if m.complete {
-		s.WriteString(fmt.Sprintf("\n  %s\n\n", doneStyle.Render("🎉 Installation Successfully Completed!")))
+		fmt.Fprintf(&s, "\n  %s\n\n", doneStyle.Render("🎉 Installation Successfully Completed!"))
 		s.WriteString("  Directories Layout:\n")
-		s.WriteString(fmt.Sprintf("    Root:        %s\n", m.finalPaths.Root))
-		s.WriteString(fmt.Sprintf("    FXServer:    %s\n", m.finalPaths.FxServerDir))
-		s.WriteString(fmt.Sprintf("    ServerData:  %s\n", m.finalPaths.ServerDataDir))
+		fmt.Fprintf(&s, "    Root:        %s\n", m.finalPaths.Root)
+		fmt.Fprintf(&s, "    FXServer:    %s\n", m.finalPaths.FxServerDir)
+		fmt.Fprintf(&s, "    ServerData:  %s\n", m.finalPaths.ServerDataDir)
 		if m.noLicense {
-			s.WriteString(fmt.Sprintf("\n  %s\n", warnStyle.Render("⚠️ Warning: No --license passed. Edit server.cfg before starting.")))
+			fmt.Fprintf(&s, "\n  %s\n", warnStyle.Render("⚠️ Warning: No --license passed. Edit server.cfg before starting."))
 		}
 		return tea.NewView(s.String())
 	}
 
-	// Render active running step
 	if m.activeStep != "" {
 		sub := ""
 		if m.subStatus != "" {
 			sub = subTextStyle.Render(" (" + m.subStatus + ")")
 		}
-		s.WriteString(fmt.Sprintf("  %s %s%s\n", m.spinner.View(), m.activeStep, sub))
+
+		// Toggle between rendering the progress bar or the spinner
+		if m.showProgress {
+			fmt.Fprintf(&s, "  %s %s%s\n", m.progress.View(), m.activeStep, sub)
+		} else {
+			fmt.Fprintf(&s, "  %s %s%s\n", m.spinner.View(), m.activeStep, sub)
+		}
 	}
 
 	s.WriteString(subTextStyle.Render("\n  [Press Q or Ctrl+C to abort]\n"))
 	return tea.NewView(s.String())
+}
+
+// buildProgress is a helper to avoid repetitive callback declarations
+func buildProgress(p *tea.Program, startMsg, doneMsg string) *downloader.Progress {
+	return &downloader.Progress{
+		OnStart: func(url string) {
+			p.Send(subStatusMsg(startMsg))
+		},
+		OnProgress: func(ratio float64) {
+			p.Send(progressMsg(ratio))
+		},
+		OnDone: func(url, destDir string) {
+			p.Send(hideProgressMsg{}) // Switch back to the spinner for extraction
+			p.Send(subStatusMsg(doneMsg))
+		},
+	}
 }
 
 func main() {
@@ -148,15 +186,18 @@ func main() {
 	)
 	flag.Parse()
 
-	// Initialize v2 loading spinner
 	sp := spinner.New()
 	sp.Spinner = spinner.Dot
 	sp.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("81"))
 
-	m := model{spinner: sp}
+	prog := progress.New(progress.WithDefaultBlend())
+
+	m := model{
+		spinner:  sp,
+		progress: prog,
+	}
 	p := tea.NewProgram(m)
 
-	// Fire off installation logic on a separate background thread
 	go runInstallationPipeline(p, *dir, *osFlag, *license, *recipeURL)
 
 	if _, err := p.Run(); err != nil {
@@ -194,10 +235,7 @@ func runInstallationPipeline(p *tea.Program, dir, osFlag, license, recipeURL str
 	}
 
 	p.Send(statusMsg(fmt.Sprintf("Downloading FXServer artifact (build %s)", label)))
-	progServer := &downloader.Progress{
-		OnStart: func(url string) { p.Send(subStatusMsg("downloading...")) },
-		OnDone:  func(url, destDir string) { p.Send(subStatusMsg("extracting...")) },
-	}
+	progServer := buildProgress(p, "downloading...", "extracting...")
 	if err := downloader.DownloadAndExtract(url, paths.FxServerDir, url, progServer); err != nil {
 		p.Send(errMsg{fmt.Errorf("installing fxServer artifact: %w", err)})
 		return
@@ -217,20 +255,14 @@ func runInstallationPipeline(p *tea.Program, dir, osFlag, license, recipeURL str
 	}
 
 	p.Send(statusMsg("Downloading fxManager webpanel"))
-	progPanel := &downloader.Progress{
-		OnStart: func(url string) { p.Send(subStatusMsg("fetching archive...")) },
-		OnDone:  func(url, destDir string) { p.Send(subStatusMsg("extracting webpanel...")) },
-	}
+	progPanel := buildProgress(p, "fetching archive...", "extracting webpanel...")
 	if err := downloader.DownloadAndExtract(panelAsset.DownloadURL, paths.Root, panelAsset.Name, progPanel); err != nil {
 		p.Send(errMsg{err})
 		return
 	}
 
 	p.Send(statusMsg("Downloading fxManager lua game resource"))
-	progRes := &downloader.Progress{
-		OnStart: func(url string) { p.Send(subStatusMsg("fetching archive...")) },
-		OnDone:  func(url, destDir string) { p.Send(subStatusMsg("unpacking to temp...")) },
-	}
+	progRes := buildProgress(p, "fetching archive...", "unpacking to temp...")
 	resourceTmp, err := downloader.DownloadAndExtractToTemp(resourceAsset.DownloadURL, resourceAsset.Name, progRes)
 	if err != nil {
 		p.Send(errMsg{err})
@@ -264,7 +296,6 @@ func runInstallationPipeline(p *tea.Program, dir, osFlag, license, recipeURL str
 		}
 	}
 
-	// Dispatch completion payload
 	p.Send(successMsg{paths: paths, noLicense: license == ""})
 }
 
