@@ -1,5 +1,5 @@
 // Package cfgwriter generates and edits the server.cfg that lives in
-// serverData/. It writes a minimal, working default and knows how to
+// server-data/. It writes a minimal, working default and knows how to
 // inject specific values (i.e. cfx license key) into it
 package cfgwriter
 
@@ -82,7 +82,7 @@ var licenseLineRe = regexp.MustCompile(`(?m)^\s*#?\s*sv_licenseKey\s+".*"\s*$`)
 
 // Write creates server.cfg at path if it doesn't exist yet, using the
 // default template. If it already exists (e.g. re-running the
-// installer against an existing serverData/), Write only touches the
+// installer against an existing server-data/), Write only touches the
 // sv_licenseKey line via Inject, leaving everything else alone
 func Write(path string, opts Options) error {
 	if _, err := os.Stat(path); err == nil {

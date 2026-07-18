@@ -86,7 +86,7 @@ func run() error {
 	}
 
 	fmt.Println("\nDone. Layout:")
-	fmt.Printf("  %s\n", paths.FxManagerDir)
+	fmt.Printf("  %s\n", paths.Root)
 	fmt.Printf("  %s\n", paths.FxServerDir)
 	fmt.Printf("  %s\n", paths.ServerDataDir)
 	if *license == "" {
@@ -113,7 +113,7 @@ func installFxManager(target platform.Target, paths *layout.Paths) error {
 	}
 
 	step(fmt.Sprintf("Downloading + extracting webpanel (%s)", panelAsset.Name))
-	if err := downloader.DownloadAndExtract(panelAsset.DownloadURL, paths.FxManagerDir, panelAsset.Name, progress()); err != nil {
+	if err := downloader.DownloadAndExtract(panelAsset.DownloadURL, paths.Root, panelAsset.Name, progress()); err != nil {
 		return err
 	}
 	done()

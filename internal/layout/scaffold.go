@@ -1,8 +1,8 @@
 // Package layout builds and populates the on-disk folder structure:
 //
-//	<root>/fxManager/     - the fxManager panel binary + its assets
+//	<root>/               - the fxManager panel binary + its assets
 //	<root>/fxServer/      - the extracted CFX server artifact
-//	<root>/serverData/    - resources/ + server.cfg, what fxManager points at
+//	<root>/server-data/    - resources/ + server.cfg, what fxManager points at
 //
 // This only guarantees the three top-level roots exist and
 // that the fxManager resource lands in the right spot inside fxServer/
@@ -18,29 +18,27 @@ import (
 // Paths holds every directory the installer needs to know about
 type Paths struct {
 	Root          string
-	FxManagerDir  string
 	FxServerDir   string
 	ServerDataDir string
-	ResourcesDir  string // serverData/resources
-	ServerCfgPath string // serverData/server.cfg
+	ResourcesDir  string // server-data/resources
+	ServerCfgPath string // server-data/server.cfg
 	SystemResDir  string // fxServer/citizen/system_resources (linux layout differs, see SystemResourcesPath)
 	TargetOS      string
 }
 
-// Scaffold creates the top-level fxManager/, fxServer/, serverData/
-// directories under root, plus serverData/resources
+// Scaffold creates the top-level fxServer/, server-data/
+// directories under root, plus server-data/resources
 func Scaffold(root, targetOS string) (*Paths, error) {
 	p := &Paths{
 		Root:          root,
-		FxManagerDir:  filepath.Join(root, "fxManager"),
 		FxServerDir:   filepath.Join(root, "fxServer"),
-		ServerDataDir: filepath.Join(root, "serverData"),
+		ServerDataDir: filepath.Join(root, "server-data"),
 		TargetOS:      targetOS,
 	}
 	p.ResourcesDir = filepath.Join(p.ServerDataDir, "resources")
 	p.ServerCfgPath = filepath.Join(p.ServerDataDir, "server.cfg")
 
-	for _, dir := range []string{p.FxManagerDir, p.FxServerDir, p.ResourcesDir} {
+	for _, dir := range []string{p.FxServerDir, p.ResourcesDir} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return nil, fmt.Errorf("creating %s: %w", dir, err)
 		}
