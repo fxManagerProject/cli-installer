@@ -76,7 +76,7 @@ sets sv_projectDescription "A cool server - Powered by fxManager"
 `
 
 const licenseLine = `sv_licenseKey "%s"`
-const licenseLinePlaceholder = `# sv_licenseKey "REPLACE_WITH_YOUR_CFX_LICENSE_KEY"  # get one at https://keymaster.fivem.net`
+const licenseLinePlaceholder = `# sv_licenseKey "REPLACE_WITH_YOUR_CFX_LICENSE_KEY"  # get one at https://portal.cfx.re/servers/registration-keys?modal=create`
 
 var licenseLineRe = regexp.MustCompile(`(?m)^\s*#?\s*sv_licenseKey\s+".*"\s*$`)
 
