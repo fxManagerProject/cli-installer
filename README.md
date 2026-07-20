@@ -19,6 +19,31 @@ A utility for assisting projects in setting up or updating a server with **fxMan
 
 ---
 
+## Quick Install & Run
+
+Run a single command in your terminal to download the latest executable as `fxmanager-installer` and immediately launch it:
+
+### Windows (PowerShell)
+
+```bash
+Invoke-WebRequest -Uri \
+    'https://github.com/fxManagerProject/cli-installer/releases/latest/download/fxmanager-installer-windows-amd64.exe' \
+    -OutFile 'fxmanager-installer.exe'; \
+    .\fxmanager-installer.exe
+```
+
+### Linux
+
+```bash
+curl -sSL \
+    'https://github.com/fxManagerProject/cli-installer/releases/latest/download/fxmanager-installer-linux-amd64' \
+    -o fxmanager-installer && \
+    chmod +x fxmanager-installer && \
+    ./fxmanager-installer
+```
+
+---
+
 ## Usage
 
 ### Interactive Mode (Default)
