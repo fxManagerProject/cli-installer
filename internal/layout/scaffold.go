@@ -94,11 +94,7 @@ func (p *Paths) PlaceFxManagerResource(extractedResourceDir string) error {
 	if err != nil {
 		return err
 	}
-	dest := filepath.Join(sysRes, "fxManager")
-	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
-		return err
-	}
-	return copyTree(extractedResourceDir, dest)
+	return copyTree(extractedResourceDir, sysRes)
 }
 
 // RemoveTxAdminResource removes the txAdmin (monitor) resource from
