@@ -32,12 +32,21 @@ type Param struct {
 	Default string   // default value; empty means "no default"
 	Prompt  bool     // ask the user (list) when not provided and no default
 	Options []Option // choices for the selector / accepted flag values
+	Action  string   // actions that are required to consider this parameter
 }
 
 // Result is everything the UI needs after flags are parsed.
 type Result struct {
 	Values  map[string]string // resolved values (from flags + defaults)
 	Prompts []Param           // parameters still needing an interactive choice
+}
+
+// AppliesToAction returns true if the parameter applies to the given action.
+func (p Param) AppliesToAction(action string) bool {
+	if len(p.Action) == 0 || action == "" {
+		return true
+	}
+	return strings.EqualFold(p.Action, action)
 }
 
 // Parse registers a flag per parameter, parses os.Args, and returns the split
@@ -68,7 +77,24 @@ func ParseArgs(params []Param, args []string) (Result, error) {
 	fs.Visit(func(f *flag.Flag) { set[f.Name] = true })
 
 	res := Result{Values: map[string]string{}}
+
+	resolvedAction := ""
 	for _, p := range params {
+		if p.Key == "action" {
+			if set[p.Flag] {
+				resolvedAction = *raw[p.Key]
+			} else if p.Default != "" {
+				resolvedAction = p.Default
+			}
+			break
+		}
+	}
+
+	for _, p := range params {
+		if resolvedAction != "" && !p.AppliesToAction(resolvedAction) {
+			continue
+		}
+
 		switch {
 		case set[p.Flag]:
 			v := *raw[p.Key]
