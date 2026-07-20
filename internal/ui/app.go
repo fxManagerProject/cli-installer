@@ -70,6 +70,9 @@ func (m appModel) Init() tea.Cmd {
 	if m.phase == phaseRun {
 		return m.runner.Init()
 	}
+	if m.phase == phasePrompt {
+		return m.selector.Init()
+	}
 	return nil
 }
 
@@ -120,13 +123,21 @@ func (m appModel) updatePrompt(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	if m.selector.chosen {
 		p := m.prompts[m.promptIdx]
-		m.values[p.Key] = m.selector.Value()
+		chosenVal := m.selector.Value()
+		m.values[p.Key] = chosenVal
+
+		// Dynamically filter remaining prompts if the user just selected the "action"
+		if p.Key == "action" {
+			remaining := m.prompts[m.promptIdx+1:]
+			m.prompts = append(m.prompts[:m.promptIdx+1], config.FilterPrompts(remaining, chosenVal)...)
+		}
+
 		m.promptIdx++
 
 		if m.promptIdx < len(m.prompts) {
 			m.selector = newSelector(m.theme, m.prompts[m.promptIdx])
 			m.selector.width = m.width
-			return m, nil
+			return m, m.selector.Init() // Kicks off cursor blink for input prompts
 		}
 		// All prompts answered -> run. Sequence the mutation before returning m.
 		cmd := m.enterRun()
