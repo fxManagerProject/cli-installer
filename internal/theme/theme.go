@@ -6,10 +6,10 @@ import "github.com/charmbracelet/lipgloss"
 // Theme holds the base palette plus the styles derived from it.
 type Theme struct {
 	// Base palette (adaptive: first value = light terminals, second = dark).
-	Primary   lipgloss.AdaptiveColor // accent / current selection
-	Secondary lipgloss.AdaptiveColor // secondary accent / descriptions
-	Text      lipgloss.AdaptiveColor // default foreground
-	Subtle    lipgloss.AdaptiveColor // dimmed foreground (hints, pending items)
+	Primary   lipgloss.AdaptiveColor
+	Secondary lipgloss.AdaptiveColor
+	Text      lipgloss.AdaptiveColor
+	Subtle    lipgloss.AdaptiveColor
 	Success   lipgloss.AdaptiveColor
 	Error     lipgloss.AdaptiveColor
 	Border    lipgloss.AdaptiveColor
@@ -36,15 +36,15 @@ type Theme struct {
 // Default returns the built-in theme.
 func Default() Theme {
 	t := Theme{
-		Primary:   lipgloss.AdaptiveColor{Light: "#7C3AED", Dark: "#A78BFA"},
-		Secondary: lipgloss.AdaptiveColor{Light: "#DB2777", Dark: "#F472B6"},
-		Text:      lipgloss.AdaptiveColor{Light: "#1F2937", Dark: "#E5E7EB"},
-		Subtle:    lipgloss.AdaptiveColor{Light: "#6B7280", Dark: "#9CA3AF"},
+		Primary:   lipgloss.AdaptiveColor{Light: "#C85B1B", Dark: "#ED8E26"},
+		Secondary: lipgloss.AdaptiveColor{Light: "#E07528", Dark: "#F8C648"},
+		Text:      lipgloss.AdaptiveColor{Light: "#1D1C21", Dark: "#FAFAFA"},
+		Subtle:    lipgloss.AdaptiveColor{Light: "#807E86", Dark: "#A9A8AE"},
 		Success:   lipgloss.AdaptiveColor{Light: "#059669", Dark: "#34D399"},
-		Error:     lipgloss.AdaptiveColor{Light: "#DC2626", Dark: "#F87171"},
-		Border:    lipgloss.AdaptiveColor{Light: "#D1D5DB", Dark: "#374151"},
-		GradientA: "#7C3AED",
-		GradientB: "#EC4899",
+		Error:     lipgloss.AdaptiveColor{Light: "#E5332C", Dark: "#FF6E67"},
+		Border:    lipgloss.AdaptiveColor{Light: "#E5E4E8", Dark: "#323137"},
+		GradientA: "#F8C648",
+		GradientB: "#C85B1B",
 	}
 	return t.build()
 }
