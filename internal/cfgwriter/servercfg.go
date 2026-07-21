@@ -73,6 +73,7 @@ sets sv_projectDescription "A cool server - Powered by fxManager"
 
 # Don't ensure fxManager, it's already handled by the panel
 # Start your resources using "start your_resource" below
+ensure chat
 `
 
 const licenseLine = `sv_licenseKey "%s"`
