@@ -28,7 +28,9 @@ func main() {
 			Prompt: true,
 			Options: []config.Option{
 				{Value: "install", Title: "Install", Desc: "Fresh fxServer & fxManager installation"},
-				{Value: "update", Title: "Update", Desc: "Update fxManager installation"},
+				{Value: "update-fxmanager", Title: "Update fxManager", Desc: "Update fxManager installation"},
+				{Value: "update-fxserver", Title: "Update fxServer", Desc: "Update fxServer installation"},
+				{Value: "update-all", Title: "Update all", Desc: "Update fxManager and fxServer installations"},
 			},
 		},
 		{

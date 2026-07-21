@@ -13,8 +13,12 @@ func Build(values map[string]string) []ui.Task {
 	switch action {
 	case "install":
 		return installTasks(values)
-	case "update":
-		return updateTasks(values)
+	case "update-fxmanager":
+		return updateTasks(values, UpdateFxManager)
+	case "update-fxserver":
+		return updateTasks(values, UpdateFxServer)
+	case "update-all":
+		return updateTasks(values, UpdateAll)
 	default:
 		return []ui.Task{
 			{
