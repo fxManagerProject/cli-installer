@@ -54,6 +54,12 @@ func main() {
 			PromptType: config.PromptInput,
 			Action:     "install",
 		},
+		{
+			Key:     "artifact",
+			Flag:    "artifact",
+			Usage:   "Define the Artifact version to install/update to (i.e. 32561)",
+			Default: "",
+		},
 	}
 
 	res, err := config.Parse(params)

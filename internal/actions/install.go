@@ -6,10 +6,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/fxManagerProject/cli-installer/internal/artifacts"
 	"github.com/fxManagerProject/cli-installer/internal/cfgwriter"
 	"github.com/fxManagerProject/cli-installer/internal/downloader"
 	"github.com/fxManagerProject/cli-installer/internal/ghrelease"
-	"github.com/fxManagerProject/cli-installer/internal/jgartifacts"
 	"github.com/fxManagerProject/cli-installer/internal/layout"
 	"github.com/fxManagerProject/cli-installer/internal/platform"
 	"github.com/fxManagerProject/cli-installer/internal/recipe"
@@ -60,11 +60,21 @@ func installTasks(values map[string]string) []ui.Task {
 			},
 		},
 		{
-			Title: "Downloading recommended FXServer artifact",
+			Title: "Downloading FXServer artifact",
 			Run: func(ctx ui.Context) error {
-				url, label, err := jgartifacts.ResolveDownloadURL(target.String())
+				res, err := artifacts.Resolve(target.String(), values["artifact"])
 				if err != nil {
 					return err
+				}
+
+				if res.IsBroken {
+					confirmed, err := ui.PromptBrokenArtifact(res.ArtifactLabel, res.BrokenReason)
+					if err != nil {
+						return err
+					}
+					if !confirmed {
+						return fmt.Errorf("installation aborted by user: artifact build %s is broken (%s)", res.ArtifactLabel, res.BrokenReason)
+					}
 				}
 
 				prog := &downloader.Progress{
@@ -73,8 +83,8 @@ func installTasks(values map[string]string) []ui.Task {
 					},
 				}
 
-				if err := downloader.DownloadAndExtract(url, paths.FxServerDir, url, prog); err != nil {
-					return fmt.Errorf("installing fxServer artifact (build %s): %w", label, err)
+				if err := downloader.DownloadAndExtract(res.URL, paths.FxServerDir, res.URL, prog); err != nil {
+					return fmt.Errorf("installing fxServer artifact (build %s): %w", res.ArtifactLabel, err)
 				}
 				return nil
 			},
