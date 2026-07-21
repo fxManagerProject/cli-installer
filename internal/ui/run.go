@@ -7,6 +7,13 @@ import (
 	"github.com/fxManagerProject/cli-installer/internal/theme"
 )
 
+// askRequestMsg is sent from a task goroutine to ask the running program
+// to display a sub-model until it's Done(), then hand its final state back.
+type askRequestMsg struct {
+	model confirmModel
+	reply chan confirmModel
+}
+
 // sender bridges task goroutines and the running program. It starts with a nil
 // function and is wired to program.Send once the program exists.
 type sender struct {
@@ -17,6 +24,14 @@ func (s *sender) send(msg tea.Msg) {
 	if s.fn != nil {
 		s.fn(msg)
 	}
+}
+
+// ask blocks the calling goroutine (a task's Run) until the single running
+// Program has driven m to completion.
+func (s *sender) ask(m confirmModel) confirmModel {
+	reply := make(chan confirmModel, 1)
+	s.send(askRequestMsg{model: m, reply: reply})
+	return <-reply
 }
 
 // Run launches the interactive installer: it prompts for any unresolved

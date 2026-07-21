@@ -36,6 +36,10 @@ type appModel struct {
 	runner runnerModel
 	send   func(tea.Msg)
 
+	// prompt phase
+	activePrompt confirmModel
+	promptReply  chan confirmModel
+
 	width  int
 	height int
 	err    error
@@ -85,8 +89,29 @@ func (m *appModel) enterRun() tea.Cmd {
 }
 
 func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
+	// A task goroutine wants the screen for a sub-prompt.
+	if req, ok := msg.(askRequestMsg); ok {
+		m.activePrompt = req.model
+		m.promptReply = req.reply
+		return m, m.activePrompt.Init()
+	}
 
+	// While a sub-prompt is active, it owns all input except a hard kill.
+	if m.activePrompt != nil {
+		if key, ok := msg.(tea.KeyMsg); ok && key.String() == "ctrl+c" {
+			m.quit = true
+			return m, tea.Quit
+		}
+		updated, cmd := m.activePrompt.Update(msg)
+		m.activePrompt = updated.(confirmModel)
+		if m.activePrompt.Done() {
+			m.promptReply <- m.activePrompt // buffered(1), never blocks
+			m.activePrompt, m.promptReply = nil, nil
+		}
+		return m, cmd
+	}
+
+	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
@@ -101,7 +126,6 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 		if m.phase == phaseDone {
-			// Any key exits once we are done.
 			m.quit = true
 			return m, tea.Quit
 		}
@@ -160,6 +184,11 @@ func (m appModel) updateRun(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m appModel) View() string {
 	th := m.theme
 	out := "\n" + th.Title.Render("fxManager Installer") + "\n\n"
+
+	if m.activePrompt != nil {
+		out += m.activePrompt.View()
+		return out
+	}
 
 	switch m.phase {
 	case phasePrompt:

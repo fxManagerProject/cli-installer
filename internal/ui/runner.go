@@ -10,6 +10,11 @@ import (
 	"github.com/fxManagerProject/cli-installer/internal/theme"
 )
 
+type confirmModel interface {
+	tea.Model
+	Done() bool
+}
+
 // Context is handed to every task's Run function. Use it to report progress.
 type Context struct {
 	send func(tea.Msg)
@@ -32,6 +37,18 @@ func (c Context) Report(fraction float64) {
 		fraction = 1
 	}
 	c.send(progressMsg{index: c.idx, fraction: fraction})
+}
+
+// Ask hands control of the screen to m and blocks the calling task goroutine
+// until the user has answered it. Safe to call from the task's own goroutine,
+// same as Report.
+func (c Context) Ask(m confirmModel) confirmModel {
+	if c.send == nil {
+		return m
+	}
+	reply := make(chan confirmModel, 1)
+	c.send(askRequestMsg{model: m, reply: reply})
+	return <-reply
 }
 
 // Task is one step of the install/update flow. This is the type you plug your

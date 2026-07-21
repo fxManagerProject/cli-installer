@@ -46,46 +46,32 @@ func (m BrokenPromptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch key.String() {
 		case "q", "ctrl+c", "esc":
 			m.canceled = true
-			return m, tea.Quit
-
+			return m, nil
 		case "y", "Y":
-			m.selector.cursor = 1
-			m.selector.chosen = true
-			return m, tea.Quit
-
+			m.selector.cursor, m.selector.chosen = 1, true
+			return m, nil
 		case "n", "N":
-			m.selector.cursor = 0
-			m.selector.chosen = true
-			return m, tea.Quit
+			m.selector.cursor, m.selector.chosen = 0, true
+			return m, nil
 		}
 	}
-
 	var cmd tea.Cmd
 	m.selector, cmd = m.selector.Update(msg)
-
-	if m.selector.chosen {
-		return m, tea.Quit
-	}
-
 	return m, cmd
 }
 
-func (m BrokenPromptModel) View() string {
-	return "\n" + m.selector.View() + "\n"
-}
+func (m BrokenPromptModel) Done() bool { return m.canceled || m.selector.chosen }
 
-// PromptBrokenArtifact executes the Bubbletea list selector prompt.
-func PromptBrokenArtifact(artifact, reason string) (bool, error) {
-	p := tea.NewProgram(NewBrokenPromptModel(artifact, reason))
-	m, err := p.Run()
-	if err != nil {
-		return false, fmt.Errorf("running broken artifact prompt: %w", err)
-	}
+func (m BrokenPromptModel) View() string { return "\n" + m.selector.View() + "\n" }
 
-	model := m.(BrokenPromptModel)
+// PromptBrokenArtifact asks the already-running program to take over the
+// screen with this prompt and blocks the calling task goroutine until the
+// user answers. No second Program, no second stdin reader.
+func PromptBrokenArtifact(ctx Context, artifact, reason string) (bool, error) {
+	final := ctx.Ask(NewBrokenPromptModel(artifact, reason))
+	model := final.(BrokenPromptModel)
 	if model.canceled {
 		return false, nil
 	}
-
 	return model.selector.Value() == "continue", nil
 }

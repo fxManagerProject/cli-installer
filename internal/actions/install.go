@@ -68,7 +68,7 @@ func installTasks(values map[string]string) []ui.Task {
 				}
 
 				if res.IsBroken {
-					confirmed, err := ui.PromptBrokenArtifact(res.ArtifactLabel, res.BrokenReason)
+					confirmed, err := ui.PromptBrokenArtifact(ctx, res.ArtifactLabel, res.BrokenReason)
 					if err != nil {
 						return err
 					}
