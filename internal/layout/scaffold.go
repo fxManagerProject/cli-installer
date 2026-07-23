@@ -97,6 +97,24 @@ func (p *Paths) PlaceFxManagerResource(extractedResourceDir string) error {
 	return copyTree(extractedResourceDir, sysRes)
 }
 
+// PlaceResources copies the contents of the extracted bundle directly into server-data/resources
+func (p *Paths) PlaceResources(extractedResourceDir string) error {
+	entries, err := os.ReadDir(extractedResourceDir)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		srcPath := filepath.Join(extractedResourceDir, entry.Name())
+		dstPath := filepath.Join(p.ResourcesDir, entry.Name())
+
+		if err := copyTree(srcPath, dstPath); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // RemoveTxAdminResource removes the txAdmin (monitor) resource from
 // citizen/system_resources
 func (p *Paths) RemoveTxAdminResource() error {

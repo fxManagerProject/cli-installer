@@ -25,11 +25,12 @@ const (
 func installTasks(values map[string]string) []ui.Task {
 	// Shared pipeline state passed down sequentially between task closures
 	var (
-		target        platform.Target
-		paths         *layout.Paths
-		panelAsset    *ghrelease.Asset
-		resourceAsset *ghrelease.Asset
-		resourceTmp   string
+		target          platform.Target
+		paths           *layout.Paths
+		panelAsset      *ghrelease.Asset
+		resourceAsset   *ghrelease.Asset
+		sysResourcesTmp string
+		resourcesTmp    string
 	)
 
 	tasks := []ui.Task{
@@ -125,7 +126,7 @@ func installTasks(values map[string]string) []ui.Task {
 				}
 
 				var err error
-				resourceTmp, err = downloader.DownloadAndExtractToTemp(resourceAsset.DownloadURL, resourceAsset.Name, prog)
+				sysResourcesTmp, err = downloader.DownloadAndExtractToTemp(resourceAsset.DownloadURL, resourceAsset.Name, prog)
 				if err != nil {
 					return fmt.Errorf("downloading game resource: %w", err)
 				}
@@ -136,8 +137,59 @@ func installTasks(values map[string]string) []ui.Task {
 			Title:         "Moving game resource into system_resources",
 			Indeterminate: true,
 			Run: func(ctx ui.Context) error {
-				defer os.RemoveAll(resourceTmp)
-				if err := paths.PlaceFxManagerResource(resourceTmp); err != nil {
+				defer os.RemoveAll(sysResourcesTmp)
+				if err := paths.PlaceFxManagerResource(sysResourcesTmp); err != nil {
+					return err
+				}
+				return nil
+			},
+		},
+		{
+			Title: "Downloading cfx default resources",
+			Run: func(ctx ui.Context) error {
+				prog := &downloader.Progress{
+					OnProgress: func(ratio float64) {
+						ctx.Report(ratio)
+					},
+				}
+
+				var err error
+				resourcesTmp, err = downloader.DownloadAndExtractToTemp(
+					"https://github.com/citizenfx/cfx-server-data/archive/refs/heads/master.zip",
+					"master.zip",
+					prog,
+				)
+				if err != nil {
+					return fmt.Errorf("downloading cfx default resources: %w", err)
+				}
+				return nil
+			},
+		},
+		// ToDo: remove this as it'll be replaced by the recipe logic
+		//       at least, when I decide to implement that (one day)
+		{
+			Title:         "Moving cfx default resources into resources",
+			Indeterminate: true,
+			Run: func(ctx ui.Context) error {
+				defer os.RemoveAll(resourcesTmp)
+
+				entries, err := os.ReadDir(resourcesTmp)
+				if err != nil {
+					return err
+				}
+
+				if len(entries) == 0 {
+					return fmt.Errorf("extracted resources directory is empty")
+				}
+
+				extractedRoot := filepath.Join(resourcesTmp, entries[0].Name())
+				innerResources := filepath.Join(extractedRoot, "resources")
+
+				if _, err := os.Stat(innerResources); os.IsNotExist(err) {
+					innerResources = extractedRoot
+				}
+
+				if err := paths.PlaceResources(innerResources); err != nil {
 					return err
 				}
 				return nil
