@@ -73,7 +73,12 @@ sets sv_projectDescription "A cool server - Powered by fxManager"
 
 # Don't ensure fxManager, it's already handled by the panel
 # Start your resources using "start your_resource" below
+ensure mapmanager
 ensure chat
+ensure spawnmanager
+ensure sessionmanager
+ensure basic-gamemode
+ensure hardcap
 `
 
 const licenseLine = `sv_licenseKey "%s"`
