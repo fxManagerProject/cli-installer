@@ -77,7 +77,73 @@ type (
 	}
 	startMsg   struct{}
 	allDoneMsg struct{ err error }
+
+	// subTasksInitMsg is sent once a task discovers its sub-steps at runtime
+	// (e.g. after parsing a recipe's yaml). It replaces any prior sub-task
+	// list for that task.
+	subTasksInitMsg struct {
+		taskIndex int
+		titles    []string
+	}
+	subTaskStartMsg struct {
+		taskIndex int
+		subIndex  int
+	}
+	subTaskProgressMsg struct {
+		taskIndex int
+		subIndex  int
+		fraction  float64
+	}
+	subTaskDoneMsg struct {
+		taskIndex int
+		subIndex  int
+		err       error
+	}
 )
+
+// --- sub tasks ------------------------------------------------------------
+
+// SetSubTasks declares the sub-steps of the current task once they're known
+// (e.g. after a recipe's yaml has been parsed). Call this before reporting
+// any sub-task progress. Safe to call from the task's own goroutine.
+func (c Context) SetSubTasks(titles []string) {
+	if c.send == nil {
+		return
+	}
+	c.send(subTasksInitMsg{taskIndex: c.idx, titles: titles})
+}
+
+// SubTaskStarted marks sub-task i as running and resets its progress bar.
+func (c Context) SubTaskStarted(i int) {
+	if c.send == nil {
+		return
+	}
+	c.send(subTaskStartMsg{taskIndex: c.idx, subIndex: i})
+}
+
+// SubTaskProgress updates the progress bar for the currently running
+// sub-task. fraction is clamped to [0, 1]. For a step with no measurable
+// progress (a move, a query, etc.), just skip calling this.
+func (c Context) SubTaskProgress(i int, fraction float64) {
+	if c.send == nil {
+		return
+	}
+	if fraction < 0 {
+		fraction = 0
+	}
+	if fraction > 1 {
+		fraction = 1
+	}
+	c.send(subTaskProgressMsg{taskIndex: c.idx, subIndex: i, fraction: fraction})
+}
+
+// SubTaskDone marks sub-task i finished. Pass a non-nil err to mark it failed.
+func (c Context) SubTaskDone(i int, err error) {
+	if c.send == nil {
+		return
+	}
+	c.send(subTaskDoneMsg{taskIndex: c.idx, subIndex: i, err: err})
+}
 
 // --- status ---------------------------------------------------------------
 
@@ -96,32 +162,52 @@ type runnerModel struct {
 	theme    theme.Theme
 	tasks    []Task
 	status   []taskStatus
-	current  int // index of the running task, -1 before the first starts
+	current  int
 	progress progress.Model
 	spinner  spinner.Model
 	send     func(tea.Msg)
 	width    int
 	done     bool
 	err      error
+
+	// sub-task state, keyed by top-level task index. subTitles[i] is nil
+	// until that task calls SetSubTasks; tasks that never do have no
+	// sub-task rendering at all.
+	subTitles   [][]string
+	subStatus   [][]taskStatus
+	subCurrent  []int // running sub-index per task, -1 if none running
+	subProgress progress.Model
 }
 
 func newRunner(th theme.Theme, tasks []Task, send func(tea.Msg)) runnerModel {
 	p := progress.New(progress.WithGradient(th.GradientA, th.GradientB))
 	p.Width = 40
 
+	sp := progress.New(progress.WithGradient(th.GradientA, th.GradientB))
+	sp.Width = 30
+
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = th.Cursor
 
+	subCurrent := make([]int, len(tasks))
+	for i := range subCurrent {
+		subCurrent[i] = -1
+	}
+
 	return runnerModel{
-		theme:    th,
-		tasks:    tasks,
-		status:   make([]taskStatus, len(tasks)),
-		current:  -1,
-		progress: p,
-		spinner:  s,
-		send:     send,
-		width:    60,
+		theme:       th,
+		tasks:       tasks,
+		status:      make([]taskStatus, len(tasks)),
+		current:     -1,
+		progress:    p,
+		spinner:     s,
+		send:        send,
+		width:       60,
+		subTitles:   make([][]string, len(tasks)),
+		subStatus:   make([][]taskStatus, len(tasks)),
+		subCurrent:  subCurrent,
+		subProgress: sp,
 	}
 }
 
@@ -211,7 +297,55 @@ func (m runnerModel) Update(msg tea.Msg) (runnerModel, tea.Cmd) {
 	case progress.FrameMsg:
 		pm, cmd := m.progress.Update(msg)
 		m.progress = pm.(progress.Model)
+
+		spm, spCmd := m.subProgress.Update(msg)
+		m.subProgress = spm.(progress.Model)
+
+		return m, tea.Batch(cmd, spCmd)
+
+	case subTasksInitMsg:
+		if msg.taskIndex != m.current {
+			return m, nil
+		}
+		m.subTitles[msg.taskIndex] = msg.titles
+		m.subStatus[msg.taskIndex] = make([]taskStatus, len(msg.titles))
+		return m, nil
+
+	case subTaskStartMsg:
+		if msg.taskIndex != m.current {
+			return m, nil
+		}
+		if msg.subIndex < 0 || msg.subIndex >= len(m.subStatus[msg.taskIndex]) {
+			return m, nil
+		}
+		m.subStatus[msg.taskIndex][msg.subIndex] = statusRunning
+		m.subCurrent[msg.taskIndex] = msg.subIndex
+		cmd := m.subProgress.SetPercent(0)
 		return m, cmd
+
+	case subTaskProgressMsg:
+		if msg.taskIndex != m.current || msg.subIndex != m.subCurrent[msg.taskIndex] {
+			return m, nil
+		}
+		cmd := m.subProgress.SetPercent(msg.fraction)
+		return m, cmd
+
+	case subTaskDoneMsg:
+		if msg.taskIndex != m.current {
+			return m, nil
+		}
+		if msg.subIndex < 0 || msg.subIndex >= len(m.subStatus[msg.taskIndex]) {
+			return m, nil
+		}
+		if msg.err != nil {
+			m.subStatus[msg.taskIndex][msg.subIndex] = statusFailed
+		} else {
+			m.subStatus[msg.taskIndex][msg.subIndex] = statusDone
+		}
+		if m.subCurrent[msg.taskIndex] == msg.subIndex {
+			m.subCurrent[msg.taskIndex] = -1
+		}
+		return m, nil
 	}
 
 	return m, nil
@@ -236,6 +370,7 @@ func (m runnerModel) View() string {
 				b.WriteString(th.Cursor.Render("▸ ") + th.Heading.Render(t.Title) + "\n")
 				b.WriteString("   " + m.progress.View() + "\n")
 			}
+			m.writeSubTasks(&b, th, i)
 
 		default: // statusPending
 			b.WriteString(th.Hint.Render("  "+t.Title) + "\n")
@@ -243,4 +378,30 @@ func (m runnerModel) View() string {
 	}
 
 	return b.String()
+}
+
+// writeSubTasks renders task i's sub-steps, indented beneath it. A no-op
+// until that task calls ctx.SetSubTasks — tasks that never do (the vast
+// majority) render exactly as before.
+func (m runnerModel) writeSubTasks(b *strings.Builder, th theme.Theme, i int) {
+	titles := m.subTitles[i]
+	if len(titles) == 0 {
+		return
+	}
+	statuses := m.subStatus[i]
+	for j, title := range titles {
+		switch statuses[j] {
+		case statusDone:
+			b.WriteString("    " + th.SuccessTxt.Render("✓ ") + th.Hint.Render(title) + "\n")
+		case statusFailed:
+			b.WriteString("    " + th.ErrorTxt.Render("✗ ") + th.Hint.Render(title) + "\n")
+		case statusRunning:
+			b.WriteString("    " + th.Cursor.Render("▸ ") + th.Item.Render(title) + "\n")
+			if m.subCurrent[i] == j {
+				b.WriteString("       " + m.subProgress.View() + "\n")
+			}
+		default:
+			b.WriteString("    " + th.Hint.Render("  "+title) + "\n")
+		}
+	}
 }
