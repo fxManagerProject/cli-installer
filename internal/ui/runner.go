@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/progress"
@@ -380,28 +381,51 @@ func (m runnerModel) View() string {
 	return b.String()
 }
 
-// writeSubTasks renders task i's sub-steps, indented beneath it. A no-op
-// until that task calls ctx.SetSubTasks — tasks that never do (the vast
-// majority) render exactly as before.
+// writeSubTasks renders task i's sub-steps, indented beneath it. Limits rendering
+// to the active step and up to 4 upcoming steps to keep the UI compact.
 func (m runnerModel) writeSubTasks(b *strings.Builder, th theme.Theme, i int) {
 	titles := m.subTitles[i]
 	if len(titles) == 0 {
 		return
 	}
 	statuses := m.subStatus[i]
-	for j, title := range titles {
+
+	startIdx := m.subCurrent[i]
+	if startIdx == -1 {
+		for j, status := range statuses {
+			if status == statusRunning || status == statusPending {
+				startIdx = j
+				break
+			}
+		}
+		if startIdx == -1 {
+			startIdx = len(titles) - 1
+		}
+	}
+
+	// limit window to 5 steps (active + next 4)
+	const maxDisplayed = 5
+	endIdx := startIdx + maxDisplayed
+	if endIdx > len(titles) {
+		endIdx = len(titles)
+	}
+
+	for j := startIdx; j < endIdx; j++ {
+		title := titles[j]
 		switch statuses[j] {
 		case statusDone:
 			b.WriteString("    " + th.SuccessTxt.Render("✓ ") + th.Hint.Render(title) + "\n")
 		case statusFailed:
 			b.WriteString("    " + th.ErrorTxt.Render("✗ ") + th.Hint.Render(title) + "\n")
 		case statusRunning:
-			b.WriteString("    " + th.Cursor.Render("▸ ") + th.Item.Render(title) + "\n")
-			if m.subCurrent[i] == j {
-				b.WriteString("       " + m.subProgress.View() + "\n")
-			}
+			b.WriteString("    " + m.spinner.View() + " " + th.Item.Render(title) + "\n")
 		default:
 			b.WriteString("    " + th.Hint.Render("  "+title) + "\n")
 		}
+	}
+
+	// Show remaining indicator if there are more upcoming steps
+	if remaining := len(titles) - endIdx; remaining > 0 {
+		b.WriteString("    " + th.Hint.Render("  ... ("+strconv.Itoa(remaining)+" more step(s))") + "\n")
 	}
 }
