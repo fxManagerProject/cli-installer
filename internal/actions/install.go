@@ -21,6 +21,15 @@ const (
 	fxManagerRepo  = "fxManager"
 )
 
+var recipeURLs = map[string]string{
+	"fivem-default": "https://raw.githubusercontent.com/citizenfx/txAdmin-recipes/refs/heads/main/default-fivem/recipe.yaml",
+	"ox_core":       "https://raw.githubusercontent.com/overextended/txAdminRecipe/main/recipe.yaml",
+	"qbox":          "https://raw.githubusercontent.com/Qbox-project/txAdminRecipe/refs/heads/main/qbox.yaml",
+	"esx":           "https://raw.githubusercontent.com/esx-framework/ESX-recipes/legacy/recipe.yaml",
+	"redm-default":  "https://raw.githubusercontent.com/citizenfx/txAdmin-recipes/refs/heads/main/default-redm/recipe.yaml",
+	"vorp":          "https://raw.githubusercontent.com/VORPCORE/VORP_txAdmin/main/vorp_recipe.yaml",
+}
+
 // installTasks constructs the step-by-step task pipeline for a fresh installation.
 func installTasks(values map[string]string) []ui.Task {
 	// Shared pipeline state passed down sequentially between task closures
@@ -30,7 +39,7 @@ func installTasks(values map[string]string) []ui.Task {
 		panelAsset      *ghrelease.Asset
 		resourceAsset   *ghrelease.Asset
 		sysResourcesTmp string
-		resourcesTmp    string
+		artifact        string
 	)
 
 	tasks := []ui.Task{
@@ -77,6 +86,8 @@ func installTasks(values map[string]string) []ui.Task {
 						return fmt.Errorf("installation aborted by user: artifact build %s is broken (%s)", res.ArtifactLabel, res.BrokenReason)
 					}
 				}
+
+				artifact = res.ArtifactLabel
 
 				prog := &downloader.Progress{
 					OnProgress: func(ratio float64) {
@@ -145,57 +156,6 @@ func installTasks(values map[string]string) []ui.Task {
 			},
 		},
 		{
-			Title: "Downloading cfx default resources",
-			Run: func(ctx ui.Context) error {
-				prog := &downloader.Progress{
-					OnProgress: func(ratio float64) {
-						ctx.Report(ratio)
-					},
-				}
-
-				var err error
-				resourcesTmp, err = downloader.DownloadAndExtractToTemp(
-					"https://github.com/citizenfx/cfx-server-data/archive/refs/heads/master.zip",
-					"master.zip",
-					prog,
-				)
-				if err != nil {
-					return fmt.Errorf("downloading cfx default resources: %w", err)
-				}
-				return nil
-			},
-		},
-		// ToDo: remove this as it'll be replaced by the recipe logic
-		//       at least, when I decide to implement that (one day)
-		{
-			Title:         "Moving cfx default resources into resources",
-			Indeterminate: true,
-			Run: func(ctx ui.Context) error {
-				defer os.RemoveAll(resourcesTmp)
-
-				entries, err := os.ReadDir(resourcesTmp)
-				if err != nil {
-					return err
-				}
-
-				if len(entries) == 0 {
-					return fmt.Errorf("extracted resources directory is empty")
-				}
-
-				extractedRoot := filepath.Join(resourcesTmp, entries[0].Name())
-				innerResources := filepath.Join(extractedRoot, "resources")
-
-				if _, err := os.Stat(innerResources); os.IsNotExist(err) {
-					innerResources = extractedRoot
-				}
-
-				if err := paths.PlaceResources(innerResources); err != nil {
-					return err
-				}
-				return nil
-			},
-		},
-		{
 			Title:         "Clearing out stock txAdmin monitor resource",
 			Indeterminate: true,
 			Run: func(ctx ui.Context) error {
@@ -205,27 +165,26 @@ func installTasks(values map[string]string) []ui.Task {
 				return nil
 			},
 		},
-		{
+	}
+
+	if recipeURL, exists := recipeURLs[values["recipe"]]; exists && values["recipe"] != "none" {
+		tasks = append(tasks, ui.Task{
+			Title: "Installing recipe: " + values["recipe"],
+			Run: func(ctx ui.Context) error {
+				if err := recipe.Installer(ctx, recipeURL, paths.ServerDataDir, values, artifact); err != nil {
+					return fmt.Errorf("recipe installation failed: %w", err)
+				}
+				return nil
+			},
+		})
+	} else {
+		tasks = append(tasks, ui.Task{
 			Title:         "Writing server configuration (server.cfg)",
 			Indeterminate: true,
 			Run: func(ctx ui.Context) error {
 				license := values["cfxlicense"]
 				if err := cfgwriter.Write(paths.ServerCfgPath, cfgwriter.Options{License: license}); err != nil {
 					return fmt.Errorf("writing server.cfg: %w", err)
-				}
-				return nil
-			},
-		},
-	}
-
-	// Optionally add recipe step if specified in params/flags
-	if recipeURL := values["recipe"]; recipeURL != "" {
-		tasks = append(tasks, ui.Task{
-			Title:         "Evaluating deployment recipe setup",
-			Indeterminate: true,
-			Run: func(ctx ui.Context) error {
-				if err := recipe.Fetch(recipeURL, paths.ServerDataDir); err != nil {
-					return fmt.Errorf("fetching recipe: %w", err)
 				}
 				return nil
 			},

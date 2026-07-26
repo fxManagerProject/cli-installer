@@ -60,6 +60,22 @@ func main() {
 			Usage:   "Define the Artifact version to install/update to (i.e. 32561)",
 			Default: "",
 		},
+		{
+			Key:    "recipe",
+			Flag:   "recipe",
+			Usage:  "The txAdmin recipe to install",
+			Prompt: true,
+			Options: []config.Option{
+				{Value: "none", Title: "Skip", Desc: "Skips any resource installation / setup, you won't be able to connect to the server."},
+				{Value: "fivem-default", Title: "(Fivem) Cfx Defaults", Desc: "A basic fivem server without framework."},
+				{Value: "ox_core", Title: "Ox Core", Desc: "The official recipe for ox_core (for advanced users)."},
+				{Value: "qbox", Title: "Qbox Core", Desc: "A FiveM core with a load of bloat."},
+				{Value: "esx", Title: "Esx", Desc: "The official recipe of the most popular FiveM RP framework, containing Jobs, Housing, Vehicles & more!"},
+				{Value: "redm-default", Title: "(Redm) Cfx Defaults", Desc: "A basic redm server without framework."},
+				{Value: "vorp", Title: "VORP Core", Desc: "VORP is the leading RP Framework for RedM containing various jobs, stables, hunting, housing & more!"},
+			},
+			Action: "install",
+		},
 	}
 
 	res, err := config.Parse(params)
