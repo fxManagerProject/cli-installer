@@ -521,6 +521,19 @@ func taskConnectDatabase(ctx context.Context, options RecipeTask, basePath strin
 	if err != nil {
 		return err
 	}
+
+	var tableCount int
+	query := "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = ?"
+	if err := dbConnection.QueryRowContext(ctx, query, dbName).Scan(&tableCount); err != nil {
+		dbConnection.Close()
+		return fmt.Errorf("failed to check existing tables: %w", err)
+	}
+
+	if tableCount > 0 {
+		dbConnection.Close()
+		return fmt.Errorf("database '%s' is not empty (%d table(s) found); please clear the database, choose a clean database name or re-run with the -dbdelete flag (provide yes)", dbName, tableCount)
+	}
+
 	deployCtx["dbConnection"] = dbConnection
 	return nil
 }
