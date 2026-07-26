@@ -66,3 +66,27 @@ func GetInteger(m map[string]any, key string, default_value int) int {
 
 	return -1
 }
+
+func GetBool(ctx DeployerCtx, key string) bool {
+	val, ok := ctx[key]
+	if !ok || val == nil {
+		return false
+	}
+
+	switch v := val.(type) {
+	case bool:
+		return v
+	case string:
+		v = strings.TrimSpace(strings.ToLower(v))
+		if v == "" {
+			return false
+		}
+		if v == "yes" || v == "y" {
+			return true
+		}
+		b, _ := strconv.ParseBool(v)
+		return b
+	default:
+		return false
+	}
+}

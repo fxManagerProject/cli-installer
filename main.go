@@ -76,6 +76,14 @@ func main() {
 			},
 			Action: "install",
 		},
+		{
+			Key:     "dbDelete",
+			Flag:    "dbdelete",
+			Usage:   "Delete any existing database when running a recipe (y/n)",
+			Default: "",
+			Prompt:  false,
+			Action:  "install",
+		},
 	}
 
 	res, err := config.Parse(params)

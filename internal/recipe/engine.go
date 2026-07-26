@@ -495,7 +495,7 @@ func taskConnectDatabase(ctx context.Context, options RecipeTask, basePath strin
 	user := GetString(deployCtx, "dbUsername")
 	pass := GetString(deployCtx, "dbPassword")
 	dbName := GetString(deployCtx, "dbName")
-	dbDelete, _ := deployCtx["dbDelete"].(bool)
+	dbDelete := GetBool(deployCtx, "dbDelete")
 
 	// Connect without DB name to create it first
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/?multiStatements=true&allowNativePasswords=true", user, pass, host, port)
