@@ -42,8 +42,8 @@ func Installer(ctx ui.Context, recipeURL string, targetDir string, values map[st
 				defaultDBName = "fxserver"
 			}
 
-			// Trigger DB prompt via ctx.Ask(...)
-			creds, confirmed, err := ui.PromptDatabaseCredentials(ctx, defaultDBName)
+			uniqueDB := fmt.Sprintf("%s_%s", defaultDBName, GenerateRandomId(5))
+			creds, confirmed, err := ui.PromptDatabaseCredentials(ctx, uniqueDB)
 			if err != nil {
 				return fmt.Errorf("prompting database configuration: %w", err)
 			}

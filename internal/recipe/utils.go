@@ -1,6 +1,7 @@
 package recipe
 
 import (
+	"crypto/rand"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -89,4 +90,17 @@ func GetBool(ctx DeployerCtx, key string) bool {
 	default:
 		return false
 	}
+}
+
+// creates a random string of lenght n
+func GenerateRandomId(n int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
+	b := make([]byte, n)
+	if _, err := rand.Read(b); err != nil {
+		return "a1b2c"
+	}
+	for i := range b {
+		b[i] = charset[int(b[i])%len(charset)]
+	}
+	return string(b)
 }
