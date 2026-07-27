@@ -98,6 +98,11 @@ func installTasks(values map[string]string) []ui.Task {
 					return err
 				}
 
+				versionPath := filepath.Join(paths.Root, "VERSION")
+				if err := os.WriteFile(versionPath, []byte(rel.TagName), 0644); err != nil {
+					return fmt.Errorf("writing VERSION file: %w", err)
+				}
+
 				var errAsset error
 				panelAsset, resourceAsset, errAsset = pickFxManagerAssets(rel, target)
 				if errAsset != nil {
