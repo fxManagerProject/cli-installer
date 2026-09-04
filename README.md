@@ -26,20 +26,15 @@ Run a single command in your terminal to download the latest executable as `fxma
 ### Windows (PowerShell)
 
 ```bash
-Invoke-WebRequest -Uri \
-    'https://github.com/fxManagerProject/cli-installer/releases/latest/download/fxmanager-installer-windows-amd64.exe' \
-    -OutFile 'fxmanager-installer.exe'; \
-    .\fxmanager-installer.exe
+powershell -c "iwr -useb https://fxmanager.dev/install.ps1 | iex"
+
 ```
 
 ### Linux
 
 ```bash
-curl -sSL \
-    'https://github.com/fxManagerProject/cli-installer/releases/latest/download/fxmanager-installer-linux-amd64' \
-    -o fxmanager-installer && \
-    chmod +x fxmanager-installer && \
-    ./fxmanager-installer
+curl -fsSL https://fxmanager.dev/install.sh | sh
+
 ```
 
 ---
