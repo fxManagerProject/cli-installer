@@ -158,6 +158,10 @@ func buildFxManagerUpdateTasks(values map[string]string) []ui.Task {
 		{
 			Title: "Downloading fxManager game resource",
 			Run: func(ctx ui.Context) error {
+				if !shouldUpdate {
+					return nil
+				}
+
 				prog := &downloader.Progress{
 					OnProgress: func(ratio float64) {
 						ctx.Report(ratio)
